@@ -159,5 +159,7 @@
   }
   body {
     @apply bg-background text-foreground;
+    background: #f7f8f6;
+    color: #17211b;
   }
 }
