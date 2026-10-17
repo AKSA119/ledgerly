@@ -58,14 +58,22 @@ export default function Page() {
       if (!engineRef.current) {
         engineRef.current = await CreateMLCEngine(modelId, { initProgressCallback: (report) => setProgress(Math.max(42, Math.round(report.progress * 42) + 42)) })
       }
+      if (!text.trim()) {
+        throw new Error('No readable text was found. Use a sharp JPG/PNG of a receipt or a text-based PDF.')
+      }
+
       const response = await engineRef.current.chat.completions.create({
         model: modelId,
         temperature: 0,
-        max_tokens: 160,
-        messages: [{ role: 'system', content: 'You extract accounting data. Return ONLY valid JSON with merchant, total, date, category, confidence. Use empty strings when unknown.' }, { role: 'user', content: `Filename: ${file.name}\nDocument text:\n${text.slice(0, 7000)}` }],
+        max_tokens: 200,
+        messages: [{ role: 'system', content: 'You extract accounting data from receipt or invoice text. Return ONLY one valid JSON object with exactly these keys: merchant, total, date, category, confidence. If this is not a receipt or invoice, set merchant to "NOT_A_RECEIPT". Use empty strings when unknown.' }, { role: 'user', content: `Filename: ${file.name}\nDocument text:\n${text.slice(0, 7000)}` }],
       })
       const raw = response.choices[0]?.message?.content ?? '{}'
-      const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim()) as Partial<Extracted>
+      const jsonMatch = raw.match(/\{[\s\S]*\}/)
+      const parsed = JSON.parse((jsonMatch?.[0] ?? '{}').replace(/```json|```/g, '').trim()) as Partial<Extracted>
+      if (parsed.merchant === 'NOT_A_RECEIPT') {
+        throw new Error('This file does not look like a receipt or invoice. Upload a JPG, PNG, or text-based PDF containing merchant, date, items, or total.')
+      }
       setReceipts((items) => [{ id: Date.now(), merchant: parsed.merchant || file.name, total: parsed.total || '—', date: parsed.date || 'Today', category: parsed.category || 'Uncategorized', confidence: parsed.confidence || '—', file: file.name, color: 'from-cyan-400 to-blue-500' }, ...items])
       setProgress(100); setStatus(`Extracted ${parsed.merchant || file.name} with Phi-3.5 Mini`)
     } catch (error) {
