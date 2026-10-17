@@ -3,3 +3,6 @@ pmOnFail: ignore
 minimumReleaseAgeExclude:
   - '@next/*'
   - next
+
+allowBuilds:
+  tesseract.js: set this to true or false
